@@ -593,6 +593,17 @@ function RadarPage() {
               setAtcOpen(true);
             }}
           />
+          <DockButton
+            icon={<MessageSquare className="size-5" />}
+            label="ACARS"
+            onClick={() => {
+              if (!user) {
+                window.location.href = "/auth";
+                return;
+              }
+              setAcarsOpen(true);
+            }}
+          />
           </div>
         </nav>
       )}
@@ -608,7 +619,28 @@ function RadarPage() {
         />
       )}
       {(isAdmin || adminUnlocked) && (
-        <AdminDialog open={adminOpen} onOpenChange={setAdminOpen} initialIcao={selectedAirport} />
+        <AdminDialog
+          open={adminOpen}
+          onOpenChange={setAdminOpen}
+          initialIcao={selectedAirport}
+          pendingPoint={pendingPoint}
+          onRequestPlace={() => {
+            setAdminOpen(false);
+            setPendingPoint(null);
+            setPlacing(true);
+          }}
+        />
+      )}
+      {user && (
+        <AcarsDialog
+          open={acarsOpen}
+          onOpenChange={setAcarsOpen}
+          flights={flights}
+          userId={user.id}
+          displayName={user.email?.split("@")[0] ?? "Pilot"}
+          isAtc={isAtc}
+          initialFlightId={selectedFlightId}
+        />
       )}
       {user && (
         <AtisDialog
