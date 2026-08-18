@@ -14,16 +14,159 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      atis: {
+        Row: {
+          active: boolean
+          airport_icao: string
+          clouds: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          letter: string
+          qnh: string | null
+          remarks: string | null
+          runway_in_use: string | null
+          temperature: string | null
+          updated_at: string
+          visibility: string | null
+          wind: string | null
+        }
+        Insert: {
+          active?: boolean
+          airport_icao: string
+          clouds?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          letter?: string
+          qnh?: string | null
+          remarks?: string | null
+          runway_in_use?: string | null
+          temperature?: string | null
+          updated_at?: string
+          visibility?: string | null
+          wind?: string | null
+        }
+        Update: {
+          active?: boolean
+          airport_icao?: string
+          clouds?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          letter?: string
+          qnh?: string | null
+          remarks?: string | null
+          runway_in_use?: string | null
+          temperature?: string | null
+          updated_at?: string
+          visibility?: string | null
+          wind?: string | null
+        }
+        Relationships: []
+      }
+      flight_plans: {
+        Row: {
+          aircraft: string
+          airline: string | null
+          arr_icao: string
+          arr_time: string
+          callsign: string
+          created_at: string
+          cruise_alt: number
+          dep_icao: string
+          dep_time: string
+          id: string
+          route: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          aircraft?: string
+          airline?: string | null
+          arr_icao: string
+          arr_time: string
+          callsign: string
+          created_at?: string
+          cruise_alt?: number
+          dep_icao: string
+          dep_time: string
+          id?: string
+          route?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          aircraft?: string
+          airline?: string | null
+          arr_icao?: string
+          arr_time?: string
+          callsign?: string
+          created_at?: string
+          cruise_alt?: number
+          dep_icao?: string
+          dep_time?: string
+          id?: string
+          route?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "atc" | "pilot"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +293,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "atc", "pilot"],
+    },
   },
 } as const
