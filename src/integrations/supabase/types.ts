@@ -14,6 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
+      aircraft_images: {
+        Row: {
+          aircraft: string
+          created_at: string
+          image_url: string
+        }
+        Insert: {
+          aircraft: string
+          created_at?: string
+          image_url: string
+        }
+        Update: {
+          aircraft?: string
+          created_at?: string
+          image_url?: string
+        }
+        Relationships: []
+      }
+      airports: {
+        Row: {
+          created_at: string
+          elevation: number
+          iata: string | null
+          icao: string
+          image_url: string | null
+          info: string | null
+          island: string
+          major: boolean
+          name: string
+          runway: number
+          updated_at: string
+          x: number
+          y: number
+        }
+        Insert: {
+          created_at?: string
+          elevation?: number
+          iata?: string | null
+          icao: string
+          image_url?: string | null
+          info?: string | null
+          island: string
+          major?: boolean
+          name: string
+          runway?: number
+          updated_at?: string
+          x: number
+          y: number
+        }
+        Update: {
+          created_at?: string
+          elevation?: number
+          iata?: string | null
+          icao?: string
+          image_url?: string | null
+          info?: string | null
+          island?: string
+          major?: boolean
+          name?: string
+          runway?: number
+          updated_at?: string
+          x?: number
+          y?: number
+        }
+        Relationships: []
+      }
+      atc_sessions: {
+        Row: {
+          airport_icao: string
+          discord_username: string | null
+          id: string
+          online: boolean
+          position: string
+          roblox_username: string | null
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          airport_icao: string
+          discord_username?: string | null
+          id?: string
+          online?: boolean
+          position: string
+          roblox_username?: string | null
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          airport_icao?: string
+          discord_username?: string | null
+          id?: string
+          online?: boolean
+          position?: string
+          roblox_username?: string | null
+          started_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       atis: {
         Row: {
           active: boolean
@@ -26,6 +128,7 @@ export type Database = {
           qnh: string | null
           remarks: string | null
           runway_in_use: string | null
+          spoken_text: string | null
           temperature: string | null
           updated_at: string
           visibility: string | null
@@ -42,6 +145,7 @@ export type Database = {
           qnh?: string | null
           remarks?: string | null
           runway_in_use?: string | null
+          spoken_text?: string | null
           temperature?: string | null
           updated_at?: string
           visibility?: string | null
@@ -58,6 +162,7 @@ export type Database = {
           qnh?: string | null
           remarks?: string | null
           runway_in_use?: string | null
+          spoken_text?: string | null
           temperature?: string | null
           updated_at?: string
           visibility?: string | null
