@@ -47,9 +47,14 @@ export async function sendPush(sub: StoredSubscription, payload: PushPayload): P
     keys,
   );
 
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(init.headers)) {
+    if (typeof value === "string") headers.set(key, value);
+  }
+
   const res = await fetch(sub.endpoint, {
     method: init.method,
-    headers: init.headers,
+    headers,
     body: init.body as unknown as BodyInit,
   });
 
