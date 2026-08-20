@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Crosshair, Plus, Trash2 } from "lucide-react";
+import { Ban, Crosshair, Plus, Trash2, Undo2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ISLANDS } from "@/lib/world";
 import type { AirportRow } from "@/lib/airports";
@@ -71,9 +71,10 @@ export function AdminDialog({
         </DialogHeader>
 
         <Tabs defaultValue="airports">
-          <TabsList className="mx-4 mt-3 grid grid-cols-2">
+          <TabsList className="mx-4 mt-3 grid grid-cols-3">
             <TabsTrigger value="airports">Airports</TabsTrigger>
             <TabsTrigger value="aircraft">Aircraft photos</TabsTrigger>
+            <TabsTrigger value="atc">ATC</TabsTrigger>
           </TabsList>
 
           <TabsContent value="airports" className="m-0">
@@ -150,9 +151,144 @@ export function AdminDialog({
               <AircraftImages />
             </ScrollArea>
           </TabsContent>
+
+          <TabsContent value="atc" className="m-0">
+            <ScrollArea className="max-h-[64vh]">
+              <AtcAdmin open={open} />
+            </ScrollArea>
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Controller management: who is online, force them offline, ban or unban them. */
+function AtcAdmin({ open }: { open: boolean }) {
+  const qc = useQueryClient();
+
+  const { data: sessions = [] } = useQuery({
+    queryKey: ["admin_atc_sessions"],
+    enabled: open,
+    refetchInterval: 20_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atc_sessions")
+        .select("*")
+        .eq("online", true)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return data as {
+        id: string;
+        user_id: string;
+        airport_icao: string;
+        position: string;
+        roblox_username: string | null;
+        discord_username: string | null;
+      }[];
+    },
+  });
+
+  const { data: bans = [] } = useQuery({
+    queryKey: ["admin_atc_bans"],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("atc_bans").select("*");
+      if (error) throw error;
+      return data as { user_id: string; reason: string | null }[];
+    },
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["admin_atc_sessions"] });
+    qc.invalidateQueries({ queryKey: ["admin_atc_bans"] });
+    qc.invalidateQueries({ queryKey: ["atc_sessions"] });
+    qc.invalidateQueries({ queryKey: ["atc_bans"] });
+  };
+
+  const forceOffline = async (userId: string) => {
+    const { error } = await supabase
+      .from("atc_sessions")
+      .update({ online: false })
+      .eq("user_id", userId)
+      .eq("online", true);
+    if (error) return toast.error(error.message);
+    toast.success("Controller forced offline");
+    refresh();
+  };
+
+  const ban = async (userId: string) => {
+    const reason = window.prompt("Reason for the ATC ban (optional)") ?? null;
+    const { error } = await supabase.from("atc_bans").upsert({ user_id: userId, reason });
+    if (error) return toast.error(error.message);
+    await supabase.from("atc_sessions").update({ online: false }).eq("user_id", userId);
+    toast.success("Controller banned from ATC");
+    refresh();
+  };
+
+  const unban = async (userId: string) => {
+    const { error } = await supabase.from("atc_bans").delete().eq("user_id", userId);
+    if (error) return toast.error(error.message);
+    toast.success("Ban lifted");
+    refresh();
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      <div>
+        <div className="mb-2 font-display text-[11px] tracking-console text-muted-foreground">
+          Online controllers ({sessions.length})
+        </div>
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {sessions.map((s) => (
+            <li key={s.id} className="flex items-center gap-2 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-foreground">
+                  {s.roblox_username ?? "Unknown"} · {s.position}
+                </div>
+                <div className="truncate font-mono text-[11px] text-muted-foreground">
+                  {s.airport_icao}
+                  {s.discord_username ? ` · ${s.discord_username}` : ""}
+                </div>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => void forceOffline(s.user_id)}>
+                Force offline
+              </Button>
+              <Button size="icon" variant="ghost" aria-label="Ban" onClick={() => void ban(s.user_id)}>
+                <Ban className="size-4 text-destructive" />
+              </Button>
+            </li>
+          ))}
+          {!sessions.length && (
+            <li className="px-3 py-4 text-center text-sm text-muted-foreground">
+              Nobody is controlling right now.
+            </li>
+          )}
+        </ul>
+      </div>
+
+      <div>
+        <div className="mb-2 font-display text-[11px] tracking-console text-muted-foreground">
+          Banned from ATC ({bans.length})
+        </div>
+        <ul className="divide-y divide-border rounded-md border border-border">
+          {bans.map((b) => (
+            <li key={b.user_id} className="flex items-center gap-2 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-mono text-[11px] text-foreground">{b.user_id}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{b.reason ?? "No reason given"}</div>
+              </div>
+              <Button size="sm" variant="secondary" className="gap-1" onClick={() => void unban(b.user_id)}>
+                <Undo2 className="size-3.5" /> Unban
+              </Button>
+            </li>
+          ))}
+          {!bans.length && (
+            <li className="px-3 py-4 text-center text-sm text-muted-foreground">No ATC bans.</li>
+          )}
+        </ul>
+      </div>
+    </div>
   );
 }
 
