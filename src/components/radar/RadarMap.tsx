@@ -20,7 +20,7 @@ import { ICON_PATHS } from "@/lib/aircraft";
  */
 const UNIFORM_ICON = ICON_PATHS.airliner;
 
-import { POSITIONS, type Atis, type AtcSession } from "@/lib/atc";
+import { positionShort, type Atis, type AtcSession } from "@/lib/atc";
 import { isEmergencySquawk } from "@/lib/squawk";
 import { cn } from "@/lib/utils";
 
@@ -696,9 +696,9 @@ function AirportMarker({
 
   /** Always-visible status: online ATC positions plus the current ATIS letter. */
   const chips = [
-    ...POSITIONS.filter((p) => sessions.some((s) => s.position === p.key)).map((p) => ({
-      key: p.key as string,
-      short: p.short,
+    ...sessions.map((s) => ({
+      key: s.id,
+      short: positionShort(s.position),
       atis: false,
     })),
     ...(atisLetter ? [{ key: "atis", short: atisLetter, atis: true }] : []),

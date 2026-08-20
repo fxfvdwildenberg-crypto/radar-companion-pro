@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { airportByIcao } from "@/lib/world";
 import { formatHm, phaseLabel, type LiveFlight } from "@/lib/flights";
 import {
-  POSITIONS,
+  positionShort,
   atisReport,
   atisSpokenText,
   speakAtis,
