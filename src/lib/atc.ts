@@ -1,13 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AtcPosition = "ground" | "tower" | "center";
+/** Free-text position label, e.g. "Tower", "Ground", "Rockford Center". */
+export type AtcPosition = string;
 
 export const POSITIONS: { key: AtcPosition; short: string; label: string }[] = [
   { key: "ground", short: "G", label: "Ground" },
   { key: "tower", short: "T", label: "Tower" },
   { key: "center", short: "C", label: "Center" },
 ];
+
+/** Short badge for any free-text position ("Tower" -> "TWR"). */
+export function positionShort(position: string): string {
+  const known = POSITIONS.find((p) => p.key.toLowerCase() === position.trim().toLowerCase());
+  if (known) return known.short;
+  const clean = position.replace(/[^a-zA-Z]/g, "");
+  return (clean.slice(0, 3) || "ATC").toUpperCase();
+}
+
+/** Everyone currently banned from claiming an ATC position. */
+export function useAtcBans() {
+  return useQuery({
+    queryKey: ["atc_bans"],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("atc_bans").select("*");
+      if (error) throw error;
+      return (data ?? []) as { user_id: string; reason: string | null; created_at: string }[];
+    },
+  });
+}
 
 export type AtcSession = {
   id: string;
