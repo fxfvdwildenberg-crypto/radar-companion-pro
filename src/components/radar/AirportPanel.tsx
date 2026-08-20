@@ -125,25 +125,20 @@ export function AirportPanel({
 
       {/* Online ATC strip */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-2.5">
-        {POSITIONS.map((p) => {
-          const s = sessions.find((x) => x.position === p.key);
-          return (
-            <span
-              key={p.key}
-              title={
-                s
-                  ? `${p.label}: ${s.roblox_username ?? "unknown"}${s.discord_username ? ` (${s.discord_username})` : ""}`
-                  : `${p.label} offline`
-              }
-              className={cn(
-                "flex size-7 items-center justify-center rounded font-display text-sm font-bold",
-                s ? "bg-[#2ecc71] text-[#04121f]" : "bg-secondary text-muted-foreground",
-              )}
-            >
-              {p.short}
-            </span>
-          );
-        })}
+        {sessions.length === 0 && (
+          <span className="flex h-7 items-center rounded bg-secondary px-2 font-display text-[11px] tracking-console text-muted-foreground">
+            No ATC online
+          </span>
+        )}
+        {sessions.map((s) => (
+          <span
+            key={s.id}
+            title={`${s.position}: ${s.roblox_username ?? "unknown"}${s.discord_username ? ` (${s.discord_username})` : ""}`}
+            className="flex h-7 items-center rounded bg-[#2ecc71] px-2 font-display text-xs font-bold text-[#04121f]"
+          >
+            {positionShort(s.position)}
+          </span>
+        ))}
         {atis && (
           <span className="flex size-7 items-center justify-center rounded bg-primary font-display text-sm font-bold text-primary-foreground">
             {atis.letter}
