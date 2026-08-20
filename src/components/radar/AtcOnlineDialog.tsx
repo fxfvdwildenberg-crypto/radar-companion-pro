@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AIRPORTS } from "@/lib/world";
-import { POSITIONS, type AtcPosition } from "@/lib/atc";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,20 +23,36 @@ export function AtcOnlineDialog({
 }) {
   const qc = useQueryClient();
   const [icao, setIcao] = useState(airportIcao ?? AIRPORTS[0]?.icao ?? "IRFD");
-  const [position, setPosition] = useState<AtcPosition>("tower");
+  const [position, setPosition] = useState("Tower");
   const [roblox, setRoblox] = useState("");
   const [discord, setDiscord] = useState("");
 
   const target = airportIcao ?? icao;
 
+  const { data: ban } = useQuery({
+    queryKey: ["atc_ban", userId],
+    enabled: open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("atc_bans")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { reason: string | null } | null;
+    },
+  });
+
   const goOnline = useMutation({
     mutationFn: async () => {
+      if (ban) throw new Error("You are banned from using ATC");
+      if (!position.trim()) throw new Error("Enter a position");
       // Close any previous session for this controller first.
       await supabase.from("atc_sessions").update({ online: false }).eq("user_id", userId);
       const { error } = await supabase.from("atc_sessions").insert({
         user_id: userId,
         airport_icao: target,
-        position,
+        position: position.trim(),
         roblox_username: roblox.trim() || null,
         discord_username: discord.trim() || null,
         online: true,
@@ -79,6 +94,11 @@ export function AtcOnlineDialog({
         </DialogHeader>
 
         <div className="space-y-3">
+          {ban && (
+            <div className="rounded-md border border-destructive/60 bg-destructive/15 px-3 py-2 text-sm text-destructive">
+              You are banned from using ATC{ban.reason ? `: ${ban.reason}` : "."}
+            </div>
+          )}
           {!airportIcao && (
             <div className="space-y-1.5">
               <Label className="font-display text-[11px] tracking-console text-muted-foreground">
@@ -103,17 +123,11 @@ export function AtcOnlineDialog({
             <Label className="font-display text-[11px] tracking-console text-muted-foreground">
               Position
             </Label>
-            <div className="grid grid-cols-3 gap-2">
-              {POSITIONS.map((p) => (
-                <Button
-                  key={p.key}
-                  variant={position === p.key ? "default" : "secondary"}
-                  onClick={() => setPosition(p.key)}
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </div>
+            <Input
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              placeholder="Tower, Ground, Rockford Center…"
+            />
           </div>
 
           <div className="space-y-1.5">
@@ -129,7 +143,11 @@ export function AtcOnlineDialog({
             <Input value={discord} onChange={(e) => setDiscord(e.target.value)} />
           </div>
 
-          <Button className="w-full" onClick={() => goOnline.mutate()} disabled={goOnline.isPending}>
+          <Button
+            className="w-full"
+            onClick={() => goOnline.mutate()}
+            disabled={goOnline.isPending || !!ban}
+          >
             Go online at {target}
           </Button>
           <Button
