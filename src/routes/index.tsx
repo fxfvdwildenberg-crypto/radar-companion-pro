@@ -8,6 +8,7 @@ import {
   Crosshair,
   Download,
   Globe2,
+  BellRing,
   GraduationCap,
   Headphones,
   LayoutGrid,
@@ -33,9 +34,16 @@ import { computeFlight, formatHm, isVisibleOnRadar, type FlightPlan, type LiveFl
 import { isEmergencySquawk, squawkInfo } from "@/lib/squawk";
 import { CATEGORIES, categoryFor, type CategoryKey } from "@/lib/aircraft";
 import { usePersistentSet, usePersistentState } from "@/lib/persist";
+import { expiresLabel, useTfrs, type Pt } from "@/lib/tfr";
 import { useFavorites, useFlightViewCounts, useRecordView } from "@/lib/favorites";
 import { useInstallPrompt } from "@/lib/pwa";
 import { requestPinPermission, useFlightPinNotification, usePinnedFlightId } from "@/lib/pin";
+import {
+  pushSupported,
+  sendTestNotification,
+  subscribeToFlightPush,
+  unsubscribeFromFlightPush,
+} from "@/lib/push";
 
 import { RadarMap } from "@/components/radar/RadarMap";
 import { AirportPanel } from "@/components/radar/AirportPanel";
@@ -101,6 +109,9 @@ function RadarPage() {
   const [acarsOpen, setAcarsOpen] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [pendingPoint, setPendingPoint] = useState<{ x: number; y: number } | null>(null);
+  const [drawingTfr, setDrawingTfr] = useState(false);
+  const [tfrDraft, setTfrDraft] = useState<Pt[]>([]);
+  const [selectedTfrId, setSelectedTfrId] = useState<string | null>(null);
 
   const [regionsOpen, setRegionsOpen] = useState(false);
   const [showClouds, setShowClouds] = usePersistentState("clouds", false);
@@ -181,9 +192,12 @@ function RadarPage() {
   // Playback simply rewinds the radar clock; everything else follows from it.
   const clock = now + offsetMin * 60_000;
 
+  const { data: tfrs = [] } = useTfrs();
+  const selectedTfr = tfrs.find((t) => t.id === selectedTfrId) ?? null;
+
   const flights: LiveFlight[] = useMemo(() => {
     const all = plans
-      .map((p) => computeFlight(p, clock))
+      .map((p) => computeFlight(p, clock, tfrs))
       .filter((f): f is LiveFlight => !!f)
       .filter((f) => isVisibleOnRadar(f, clock))
       .filter((f) => !hiddenCats.has(categoryFor(f.plan.aircraft)));
@@ -198,7 +212,7 @@ function RadarPage() {
         (isl ? Math.hypot(f.x - isl.x, f.y - isl.y) < isl.radius * 3 : false),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plans, clock, focus, Array.from(hiddenCats).sort().join(",")]);
+  }, [plans, clock, focus, tfrs, Array.from(hiddenCats).sort().join(",")]);
 
 
   const selectedFlight = flights.find((f) => f.plan.id === selectedFlightId) ?? null;
@@ -231,16 +245,32 @@ function RadarPage() {
   const togglePin = async (id: string) => {
     if (pinnedId === id) {
       setPinnedId(null);
+      await unsubscribeFromFlightPush().catch(() => undefined);
       toast.info("Flight unpinned");
       return;
     }
     const ok = await requestPinPermission();
     setPinnedId(id);
+    let background = false;
+    if (ok && pushSupported()) {
+      background = await subscribeToFlightPush(id).catch(() => false);
+    }
     toast.success(
-      ok
-        ? "Flight pinned — progress now shows in your notifications"
-        : "Flight pinned — allow notifications to see it outside the app",
+      background
+        ? "Flight pinned — alerts arrive even with the app closed"
+        : ok
+          ? "Flight pinned — progress now shows in your notifications"
+          : "Flight pinned — allow notifications to see it outside the app",
     );
+  };
+
+  const testNotification = async () => {
+    try {
+      await sendTestNotification();
+      toast.success("Test notification sent");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send a test notification");
+    }
   };
 
   const searchResults = useMemo(() => {
@@ -457,6 +487,13 @@ function RadarPage() {
                       <Download className="size-4" /> Install ATC365 app
                     </Button>
                   )}
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start gap-2"
+                    onClick={() => void testNotification()}
+                  >
+                    <BellRing className="size-4" /> Send test notification
+                  </Button>
                   <Button variant="secondary" className="w-full justify-start gap-2" onClick={resetTutorial}>
                     <GraduationCap className="size-4" /> Replay tutorial
                   </Button>
@@ -517,14 +554,90 @@ function RadarPage() {
           }}
           onSelectAirport={openAirport}
           onSelectIsland={(slug) => setFocus(slug)}
-          placing={placing}
+          placing={placing || drawingTfr}
+          tfrs={tfrs}
+          onSelectTfr={(id) => setSelectedTfrId(id)}
+          draftTfr={drawingTfr ? tfrDraft : undefined}
           onMapClick={(x, y) => {
+            if (drawingTfr) {
+              setTfrDraft((p) => [...p, { x, y }]);
+              return;
+            }
             setPendingPoint({ x, y });
             setPlacing(false);
             setAdminOpen(true);
             toast.success(`Position captured — ${x}, ${y}`);
           }}
         />
+
+        {drawingTfr && (
+          <div className="pointer-events-none absolute inset-x-0 top-16 z-40 flex justify-center px-3">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-destructive/60 bg-card/95 px-3 py-1.5 shadow-[var(--shadow-panel)] backdrop-blur">
+              <Crosshair className="size-4 text-destructive" />
+              <span className="font-display text-[11px] tracking-console text-foreground">
+                Tap to add points · {tfrDraft.length}
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2"
+                onClick={() => setTfrDraft((p) => p.slice(0, -1))}
+              >
+                Undo
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 px-2"
+                disabled={tfrDraft.length < 3}
+                onClick={() => {
+                  setDrawingTfr(false);
+                  setAdminOpen(true);
+                }}
+              >
+                Done
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2"
+                onClick={() => {
+                  setDrawingTfr(false);
+                  setTfrDraft([]);
+                  setAdminOpen(true);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {selectedTfr && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-40 flex justify-center px-3">
+            <div className="deck-surface pointer-events-auto max-w-sm animate-fade-in rounded-2xl border border-destructive/40 p-3">
+              <div className="font-display text-sm tracking-console text-destructive">
+                TFR · {selectedTfr.name}
+              </div>
+              {selectedTfr.reason && (
+                <p className="mt-1 text-sm text-foreground">{selectedTfr.reason}</p>
+              )}
+              <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                {selectedTfr.min_alt}–{selectedTfr.max_alt} ft · {expiresLabel(selectedTfr, clock)}
+                {selectedTfr.allowed_callsigns.length
+                  ? ` · exempt: ${selectedTfr.allowed_callsigns.join(", ")}`
+                  : ""}
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-2 h-7"
+                onClick={() => setSelectedTfrId(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
 
         {placing && (
           <div className="pointer-events-none absolute inset-x-0 top-16 z-40 flex justify-center px-3">
@@ -706,7 +819,24 @@ function RadarPage() {
         />
       )}
       {(isAdmin || adminUnlocked) && (
-        <AdminDialog open={adminOpen} onOpenChange={setAdminOpen} initialIcao={selectedAirport} />
+        <AdminDialog
+          open={adminOpen}
+          onOpenChange={setAdminOpen}
+          initialIcao={selectedAirport}
+          pendingPoint={pendingPoint}
+          onRequestPlace={() => {
+            setAdminOpen(false);
+            setPlacing(true);
+          }}
+          tfrDraft={tfrDraft}
+          onRequestDrawTfr={() => {
+            setAdminOpen(false);
+            setTfrDraft([]);
+            setSelectedTfrId(null);
+            setDrawingTfr(true);
+          }}
+          onClearTfrDraft={() => setTfrDraft([])}
+        />
       )}
       {user && (
         <AtisDialog
