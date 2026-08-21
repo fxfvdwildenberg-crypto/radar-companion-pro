@@ -490,17 +490,19 @@ function RadarPage() {
                   </Button>
                 </div>
 
-                <Button
-                  variant="secondary"
-                  className="mt-4 w-full gap-2"
-                  onClick={() => {
-                    setRegionsOpen(false);
-                    setAdminOpen(true);
-                  }}
-                >
-                  <Shield className="size-4" />
-                  Open admin mode
-                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="secondary"
+                    className="mt-4 w-full gap-2"
+                    onClick={() => {
+                      setRegionsOpen(false);
+                      setAdminOpen(true);
+                    }}
+                  >
+                    <Shield className="size-4" />
+                    Open admin mode
+                  </Button>
+                )}
 
               </div>
             </ScrollArea>
