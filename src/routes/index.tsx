@@ -74,10 +74,6 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 
-/** Shared admin unlock code — typed once per browser session. */
-const ADMIN_CODE = "qxirz8F30";
-
-
 const TITLE = "ATC365 — Live Island Radar & Flight Plans";
 const DESCRIPTION =
   "Track live aircraft across every island, file flight plans with departure and arrival times, and read ATC-published ATIS for each airport.";
@@ -117,9 +113,6 @@ function RadarPage() {
   const [showClouds, setShowClouds] = usePersistentState("clouds", false);
   const [showRoutes, setShowRoutes] = usePersistentState("routes", true);
   const [showLabels, setShowLabels] = usePersistentState("labels", true);
-  const [adminCodeOpen, setAdminCodeOpen] = useState(false);
-  const [adminCode, setAdminCode] = useState("");
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [query, setQuery] = useState("");
   const [widgets, setWidgets] = usePersistentSet<WidgetKey>("widgets", ["clock"]);
   const [hiddenCats, setHiddenCats] = usePersistentSet<CategoryKey>("hidden-categories", []);
@@ -127,24 +120,6 @@ function RadarPage() {
 
   const { canInstall, installed, install } = useInstallPrompt();
   const [pinnedId, setPinnedId] = usePinnedFlightId();
-
-  // Restore the admin unlock for this browser session.
-  useEffect(() => {
-    if (sessionStorage.getItem("atc365-admin") === "1") setAdminUnlocked(true);
-  }, []);
-
-  const submitAdminCode = () => {
-    if (adminCode.trim() !== ADMIN_CODE) {
-      toast.error("Incorrect admin code");
-      return;
-    }
-    sessionStorage.setItem("atc365-admin", "1");
-    setAdminUnlocked(true);
-    setAdminCode("");
-    setAdminCodeOpen(false);
-    setRegionsOpen(false);
-    setAdminOpen(true);
-  };
 
   const toggleWidget = (key: WidgetKey, on: boolean) =>
     setWidgets((prev: Set<WidgetKey>) => {
@@ -519,16 +494,12 @@ function RadarPage() {
                   variant="secondary"
                   className="mt-4 w-full gap-2"
                   onClick={() => {
-                    if (adminUnlocked) {
-                      setRegionsOpen(false);
-                      setAdminOpen(true);
-                    } else {
-                      setAdminCodeOpen(true);
-                    }
+                    setRegionsOpen(false);
+                    setAdminOpen(true);
                   }}
                 >
                   <Shield className="size-4" />
-                  {adminUnlocked ? "Open admin mode" : "Admin access"}
+                  Open admin mode
                 </Button>
 
               </div>
@@ -728,11 +699,11 @@ function RadarPage() {
             icao={selectedAirport}
             flights={flights}
             canEditAtis={!!user}
-            isAdmin={isAdmin || adminUnlocked}
+            isAdmin={isAdmin}
             sessions={atcByAirport?.get(selectedAirport) ?? []}
             onEditAtis={() => setAtisOpen(true)}
             onGoOnline={() => setAtcOpen(true)}
-            onEditAirport={() => (adminUnlocked ? setAdminOpen(true) : setAdminCodeOpen(true))}
+            onEditAirport={() => setAdminOpen(true)}
             onClose={() => setSelectedAirport(null)}
             onSelectFlight={(id) => {
               setSelectedAirport(null);
@@ -818,7 +789,7 @@ function RadarPage() {
           userId={user.id}
         />
       )}
-      {(isAdmin || adminUnlocked) && (
+      {isAdmin && (
         <AdminDialog
           open={adminOpen}
           onOpenChange={setAdminOpen}
@@ -846,32 +817,6 @@ function RadarPage() {
           userId={user.id}
         />
       )}
-
-      {/* Admin code gate */}
-      <Dialog open={adminCodeOpen} onOpenChange={setAdminCodeOpen}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl text-primary">Admin access</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label className="font-display text-[11px] tracking-console text-muted-foreground">
-              Access code
-            </Label>
-            <Input
-              type="password"
-              value={adminCode}
-              className="font-mono"
-              onChange={(e) => setAdminCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submitAdminCode()}
-            />
-          </div>
-          <DialogFooter>
-            <Button className="w-full" onClick={submitAdminCode}>
-              Unlock admin mode
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Tutorial />
     </div>
